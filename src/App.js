@@ -1,100 +1,71 @@
-import React, { useRef } from "react";
-import { Canvas, extend, useThree, useFrame } from "react-three-fiber";
-import {
-  CubeTextureLoader,
-  CubeCamera,
-  WebGLCubeRenderTarget,
-  RGBFormat,
-  LinearMipmapLinearFilter
-} from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
-import "./styles.css";
+import React, { Suspense, useLayoutEffect, useState, useRef } from "react"
+import { Canvas, useLoader, useThree, useFrame, useResource } from "react-three-fiber"
+import { CubeTextureLoader, WebGLCubeRenderTarget } from "three"
+import { OrbitControls, Loader } from "drei"
 
-extend({ OrbitControls });
-
-const CameraControls = () => {
-  // Get a reference to the Three.js Camera, and the canvas html element.
-  // We need these to setup the OrbitControls class.
-  // https://threejs.org/docs/#examples/en/controls/OrbitControls
-
-  const {
-    camera,
-    gl: { domElement }
-  } = useThree();
-
-  // Ref to the controls, so that we can update them on every frame using useFrame
-  const controls = useRef();
-  useFrame(() => controls.current.update());
-  return (
-    <orbitControls
-      ref={controls}
-      args={[camera, domElement]}
-      autoRotate={false}
-      enableZoom={false}
-    />
-  );
-};
-
-// Loads the skybox texture and applies it to the scene.
 function SkyBox() {
-  const { scene } = useThree();
-  const loader = new CubeTextureLoader();
-  // The CubeTextureLoader load method takes an array of urls representing all 6 sides of the cube.
-  const texture = loader.load([
-    "/nz.jpg",
-    "/pz.jpg",
-    "/py.jpg",
-    "/ny.jpg",
-    "/px.jpg",
-    "/nx.jpg"  
-  ]);
-
-  // Set the scene background property to the resulting texture.
-  scene.background = texture;
-  return null;
+  const { scene } = useThree()
+  const [texture] = useLoader(CubeTextureLoader, [[
+  "/nz.jpg",
+  "/pz.jpg",
+  "/py.jpg",
+  "/ny.jpg",
+  "/px.jpg",
+  "/nx.jpg"  ]])
+  useLayoutEffect(() => {
+    const oldBg = scene.background
+    scene.background = texture
+    // Clean up on unmount
+    return () => {
+      scene.background = oldBg
+      texture.dispose()
+    }
+  }, [scene, texture])
+  return null
 }
 
-// Geometry
 function Sphere() {
-  const { scene, gl } = useThree();
-  // The cubeRenderTarget is used to generate a texture for the reflective sphere.
-  // It must be updated on each frame in order to track camera movement and other changes.
-  const cubeRenderTarget = new WebGLCubeRenderTarget(256, {
-    format: RGBFormat,
-    generateMipmaps: true,
-    minFilter: LinearMipmapLinearFilter
-  });
-  const cubeCamera = new CubeCamera(1, 1000, cubeRenderTarget);
-  cubeCamera.position.set(0, 100, 0);
-  scene.add(cubeCamera);
-
-  // Update the cubeCamera with current renderer and scene.
-  useFrame(() => cubeCamera.update(gl, scene));
-
+  const camera = useResource()
+  const { scene, gl } = useThree()
+  const [cubeRenderTarget] = useState(() => new WebGLCubeRenderTarget(256))
+  useFrame(() => camera.current.update(gl, scene))
   return (
-    <mesh visible position={[0, 0, 0]} rotation={[0, 0, 0]} castShadow>
-      <directionalLight intensity={0.5} />
-      <sphereGeometry attach="geometry" args={[2, 32, 32]} />
-      <meshBasicMaterial
-        attach="material"
-        envMap={cubeCamera.renderTarget.texture}
-        color="white"
-        roughness={0.1}
-        metalness={1}
-      />
+    <>
+      <cubeCamera ref={camera} args={[1, 1000, cubeRenderTarget]} />
+      <mesh>
+        <sphereBufferGeometry args={[2, 32, 32]} />
+        <meshBasicMaterial envMap={cubeRenderTarget.texture} />
+      </mesh>
+    </>
+  )
+}
+
+function Cube(props) {
+  const ref = useRef()
+  useFrame(() => (ref.current.rotation.x = ref.current.rotation.y = ref.current.rotation.z += 0.01))
+  return (
+    <mesh ref={ref} {...props}>
+      <boxBufferGeometry args={[0.5, 0.5, 0.5]} />
+      <meshStandardMaterial />
     </mesh>
-  );
+  )
 }
 
-// Lights
-function App() {
+export default function App() {
   return (
-    <Canvas className="canvas">
-      <CameraControls />
-      {/* <Sphere /> */}
-      <SkyBox />
-    </Canvas>
-  );
+    <>
+      <Canvas>
+        <ambientLight intensity={0.2} />
+        <pointLight position={[10, 10, 10]} />
+        <pointLight position={[-10, -10, -10]} />
+        <OrbitControls />
+        <Sphere />
+        <Cube position={[1.5, 1.5, 1.5]} />
+        <Suspense fallback={null}>
+          <SkyBox />
+        </Suspense>
+      </Canvas>
+      <Loader />
+    </>
+  )
 }
-
-export default App;
