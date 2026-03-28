@@ -1,17 +1,17 @@
 import React, { Suspense, useLayoutEffect, useState, useRef } from "react"
-import { Canvas, useLoader, useThree, useFrame, useResource } from "react-three-fiber"
+import { Canvas, useLoader, useThree, useFrame } from "@react-three/fiber"
 import { CubeTextureLoader, WebGLCubeRenderTarget } from "three"
-import { OrbitControls, Loader } from "drei"
+import { OrbitControls, Loader } from "@react-three/drei"
 
 function SkyBox() {
   const { scene } = useThree()
   const [texture] = useLoader(CubeTextureLoader, [[
-  "/nz.jpg",
   "/pz.jpg",
+  "/nz.jpg",
   "/py.jpg",
   "/ny.jpg",
-  "/px.jpg",
-  "/nx.jpg"  ]])
+  "/nx.jpg",
+  "/px.jpg"  ]])
   useLayoutEffect(() => {
     const oldBg = scene.background
     scene.background = texture
@@ -25,15 +25,15 @@ function SkyBox() {
 }
 
 function Sphere() {
-  const camera = useResource()
+  const camera = useRef()
   const { scene, gl } = useThree()
   const [cubeRenderTarget] = useState(() => new WebGLCubeRenderTarget(256))
-  useFrame(() => camera.current.update(gl, scene))
+  useFrame(() => camera.current && camera.current.update(gl, scene))
   return (
     <>
       <cubeCamera ref={camera} args={[1, 1000, cubeRenderTarget]} />
       <mesh>
-        <sphereBufferGeometry args={[2, 32, 32]} />
+        <sphereGeometry args={[2, 32, 32]} />
         <meshBasicMaterial envMap={cubeRenderTarget.texture} />
       </mesh>
     </>
@@ -45,7 +45,7 @@ function Cube(props) {
   useFrame(() => (ref.current.rotation.x = ref.current.rotation.y = ref.current.rotation.z += 0.01))
   return (
     <mesh ref={ref} {...props}>
-      <boxBufferGeometry args={[0.5, 0.5, 0.5]} />
+      <boxGeometry args={[0.5, 0.5, 0.5]} />
       <meshStandardMaterial />
     </mesh>
   )
@@ -53,8 +53,8 @@ function Cube(props) {
 
 export default function App() {
   return (
-    <>
-      <Canvas>
+    <div style={{ width: "100vw", height: "100vh" }}>
+      <Canvas style={{ width: "100%", height: "100%" }}>
         <ambientLight intensity={0.2} />
         <pointLight position={[10, 10, 10]} />
         <pointLight position={[-10, -10, -10]} />
@@ -66,6 +66,6 @@ export default function App() {
         </Suspense>
       </Canvas>
       <Loader />
-    </>
+    </div>
   )
 }
